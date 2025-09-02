@@ -161,6 +161,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use num_bigint::BigUint;
     use xxhash_rust::xxh64;
 
     use super::*;
@@ -214,6 +215,19 @@ mod tests {
         let seed = 29;
         let perm = Permutation::new(n, seed, DefaultBuildHasher::new());
         for j in perm.range(100, 200) {
+            println!("{}", j);
+        }
+        for j in perm.iter().take(10) {
+            println!("{}", j);
+        }
+    }
+
+    #[test]
+    fn test_3() {
+        let n = BigUint::from(1000000u64);
+        let seed = 29u64.into();
+        let perm = Permutation::new(n, seed, DefaultBuildHasher::new());
+        for j in perm.range(100u64.into(), 200u64.into()) {
             println!("{}", j);
         }
         for j in perm.iter().take(10) {

@@ -11,9 +11,8 @@ mod feistel;
 mod permutation;
 mod utils;
 
+use num_traits::{FromPrimitive, Num, PrimInt, ToBytes, ToPrimitive};
 use std::fmt::Debug;
-use num_bigint::BigUint;
-use num_traits::{ToPrimitive, Num, ToBytes};
 use std::ops::{AddAssign, BitAnd, BitOr, BitXorAssign, Shl, Shr};
 
 pub trait NumExt:
@@ -54,49 +53,37 @@ impl<T> NumExt for T where
 {
 }
 
+///
 pub trait BitLength {
     fn bits(&self) -> u64;
 }
 
-impl BitLength for BigUint {
+impl<T: ToBytes> BitLength for T {
     fn bits(&self) -> u64 {
-        self.bits()
-    }
-}
+        let bytes = self.to_be_bytes();
+        let bytes = bytes.as_ref();
 
-impl BitLength for u8 {
-    fn bits(&self) -> u64 {
-        u8::BITS as u64
-    }
-}
+        // Zero is a special case – it needs 0 bits.
+        if bytes.iter().all(|&b| b == 0) {
+            return 0;
+        }
 
-impl BitLength for u16 {
-    fn bits(&self) -> u64 {
-        u16::BITS as u64
-    }
-}
+        // Find the first non‑zero byte (most‑significant byte).
+        let (msb_index, msb) = bytes
+            .iter()
+            .enumerate()
+            .find(|(_, &b)| b != 0)
+            .unwrap(); // safe because we already checked all‑zero above
 
-impl BitLength for u32 {
-    fn bits(&self) -> u64 {
-        u32::BITS as u64
-    }
-}
+        // Bits contributed by that byte.
+        let msb_bits = 8 - msb.leading_zeros() as u64;
 
-impl BitLength for u64 {
-    fn bits(&self) -> u64 {
-        u64::BITS as u64
-    }
-}
+        // Each subsequent byte contributes a full 8 bits.
+        let remaining_bits = (bytes.len() - msb_index - 1) as u64 * 8;
+        let total = msb_bits + remaining_bits;
 
-impl BitLength for u128 {
-    fn bits(&self) -> u64 {
-        u128::BITS as u64
-    }
-}
-
-impl BitLength for usize {
-    fn bits(&self) -> u64 {
-        usize::BITS as u64
+        // Round up to an even number of bits.
+        total + (total & 1)
     }
 }
 

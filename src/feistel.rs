@@ -89,8 +89,8 @@ mod tests {
     #[test]
     fn test_1a() {
         let bob = DefaultBuildHasher::new();
-        let bits = 32;
-        let keys = [0x1c10u64, 0x8fd6u64, 0x2d5au64, 0x7363u64, 0x5f70u64];
+        let bits = 32usize;
+        let keys = [0x1c10usize, 0x8fd6usize, 0x2d5ausize, 0x7363usize, 0x5f70usize];
         let f = Feistel::new(bob, bits, &keys);
         let x = 17;
         let y = f.encrypt(x);
@@ -103,7 +103,7 @@ mod tests {
     fn test_1b() {
         let bob = DefaultBuildHasher::new();
         let bits = 32;
-        let keys = [0x1c10u64, 0x8fd6u64, 0x2d5au64, 0x7363u64, 0x5f70u64];
+        let keys = [0x1c10usize, 0x8fd6usize, 0x2d5ausize, 0x7363usize, 0x5f70usize];
         let f = Feistel::new(bob, bits, &keys);
         let x = 234;
         let y = f.encrypt(x);
@@ -114,10 +114,10 @@ mod tests {
     #[test]
     fn test_2() {
         let bob = DefaultBuildHasher::new();
-        let bits = 56;
-        let keys = [0x1c10u64, 0x8fd6u64, 0x2d5au64, 0x7363u64, 0x5f70u64];
+        let bits = 56usize;
+        let keys = [0x1c10usize, 0x8fd6usize, 0x2d5ausize, 0x7363usize, 0x5f70usize];
         let f = Feistel::new(bob, bits, &keys);
-        let x = 17;
+        let x = 17usize;
         let y = f.encrypt(x);
         let z = f.decrypt(y);
         assert_eq!(x, z);
@@ -127,7 +127,7 @@ mod tests {
     fn test_minimum_bits() {
         let bob = DefaultBuildHasher::new();
         let bits = 0;
-        let keys = [0x1c10u64, 0x8fd6u64, 0x2d5au64, 0x7363u64, 0x5f70u64];
+        let keys = [0x1c10usize, 0x8fd6usize, 0x2d5ausize, 0x7363usize, 0x5f70usize];
         let f = Feistel::new(bob, bits, &keys);
         let x = 0;
         let y = f.encrypt(x);
@@ -140,7 +140,7 @@ mod tests {
     fn test_odd_bits() {
         let bob = DefaultBuildHasher::new();
         let bits = 1;
-        let keys = [0x1c10u64, 0x8fd6u64, 0x2d5au64, 0x7363u64, 0x5f70u64];
+        let keys = [0x1c10usize, 0x8fd6usize, 0x2d5ausize, 0x7363usize, 0x5f70usize];
         Feistel::new(bob, bits, &keys);
     }
 
@@ -149,7 +149,7 @@ mod tests {
     fn test_excessive_bits() {
         let bob = DefaultBuildHasher::new();
         let bits = 66;
-        let keys = [0x1c10u64, 0x8fd6u64, 0x2d5au64, 0x7363u64, 0x5f70u64];
+        let keys = [0x1c10usize, 0x8fd6usize, 0x2d5ausize, 0x7363usize, 0x5f70usize];
         Feistel::new(bob, bits, &keys);
     }
 }
