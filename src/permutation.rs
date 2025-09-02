@@ -1,36 +1,36 @@
 // SPDX-License-Identifier: Apache-2.0
+use crate::{DefaultBuildHasher, Feistel, NumExt};
 use std::hash::BuildHasher;
 
-use crate::{DefaultBuildHasher, Feistel};
-
 /// An object of constructing random access permutations.
-pub struct Permutation<B = DefaultBuildHasher>
+pub struct Permutation<N, B = DefaultBuildHasher>
 where
+    N: NumExt,
     B: BuildHasher,
 {
-    n: u64,
-    feistel: Feistel<B>,
+    n: N,
+    feistel: Feistel<N, B>,
 }
 
-impl<B> Permutation<B>
+impl<N, B> Permutation<N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
     /// Construct a new permutation over the range `0..n`.
-    pub fn new(n: u64, seed: u64, bob: B) -> Permutation<B> {
+    pub fn new(n: N, seed: N, bob: B) -> Permutation<N, B> {
         let mut keys = Vec::new();
         let mut k = seed;
-        for _i in 0..5 {
-            k = bob.hash_one(k);
-            keys.push(k);
+        for _ in 0..5 {
+            k = (bob.hash_one(k) as usize).into();
+            keys.push(k.clone());
         }
         //println!("keys = {:?}", keys);
 
         // Code assumes an even number of bits. Rounding up
         // increases the constant factor in [`get`] but doesn't
         // alter the big-O complexity.
-        let z = 64 - n.leading_zeros() as usize;
-        let bits = z + (z & 1);
+        let bits: N = (n.bits() as usize).into();
 
         Permutation {
             n,
@@ -39,7 +39,7 @@ where
     }
 
     /// Get the xth element of the permutation.
-    pub fn get(&self, x: u64) -> u64 {
+    pub fn get(&self, x: N) -> N {
         assert!(x < self.n);
         let mut res = self.feistel.encrypt(x);
         while res >= self.n {
@@ -49,112 +49,111 @@ where
     }
 
     /// Construct an iterator over the entire permutation.
-    pub fn iter(&self) -> PermutationIterator<'_, B> {
-        PermutationIterator::new(self, 0, self.n)
+    pub fn iter(&self) -> PermutationIterator<'_, N, B> {
+        let n = self.n.clone();
+        PermutationIterator::new(self, N::zero(), n)
     }
 
     /// Construct an iterator over the subset `begin..end` of the permutation.
-    pub fn range(&self, begin: u64, end: u64) -> PermutationIterator<'_, B> {
+    pub fn range(&self, begin: N, end: N) -> PermutationIterator<'_, N, B> {
         assert!(begin <= end);
         assert!(end <= self.n);
         PermutationIterator::new(self, begin, end)
     }
 
     /// Transform the Permutation into an iterator over the subset `begin..end` of the permutation.
-    pub fn into_range(self, begin: u64, end: u64) -> OwnedPermutationIterator<B> {
+    pub fn into_range(self, begin: N, end: N) -> OwnedPermutationIterator<N, B> {
         assert!(begin <= end);
         assert!(end <= self.n);
         OwnedPermutationIterator::new(self, begin, end)
     }
 }
 
-impl<B: std::hash::BuildHasher> IntoIterator for Permutation<B> {
-    type Item = u64;
+impl<N: NumExt, B: BuildHasher> IntoIterator for Permutation<N, B> {
+    type Item = N;
 
-    type IntoIter = OwnedPermutationIterator<B>;
+    type IntoIter = OwnedPermutationIterator<N, B>;
 
     /// Transform the Permutation into an iterator.
     fn into_iter(self) -> Self::IntoIter {
-        let end = self.n;
-        OwnedPermutationIterator::new(self, 0, end)
+        let end = self.n.clone();
+        OwnedPermutationIterator::new(self, N::zero(), end)
     }
 }
 
 /// An iterator over a [`Permutation`] object.
-pub struct PermutationIterator<'a, B>
+pub struct PermutationIterator<'a, N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
-    source: &'a Permutation<B>,
-    curr: u64,
-    end: u64,
+    source: &'a Permutation<N, B>,
+    curr: N,
+    end: N,
 }
 
-impl<'a, B> PermutationIterator<'a, B>
+impl<'a, N, B> PermutationIterator<'a, N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
-    fn new(source: &'a Permutation<B>, begin: u64, end: u64) -> PermutationIterator<'a, B> {
-        PermutationIterator {
-            source,
-            curr: begin,
-            end,
-        }
+    fn new(source: &'a Permutation<N, B>, begin: N, end: N) -> PermutationIterator<'a, N, B> {
+        PermutationIterator { source, curr: begin, end }
     }
 }
 
-impl<'a, B> Iterator for PermutationIterator<'a, B>
+impl<'a, N, B> Iterator for PermutationIterator<'a, N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
-    type Item = u64;
+    type Item = N;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.curr == self.end {
             None
         } else {
-            let res = self.source.get(self.curr);
-            self.curr += 1;
+            let res = self.source.get(self.curr.clone());
+            self.curr.add_assign(N::one());
             Some(res)
         }
     }
 }
 
 /// An iterator over a [`Permutation`] object that owns the Permutation.
-pub struct OwnedPermutationIterator<B>
+pub struct OwnedPermutationIterator<N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
-    source: Permutation<B>,
-    curr: u64,
-    end: u64,
+    source: Permutation<N, B>,
+    curr: N,
+    end: N,
 }
 
-impl<B> OwnedPermutationIterator<B>
+impl<N, B> OwnedPermutationIterator<N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
-    fn new(source: Permutation<B>, begin: u64, end: u64) -> OwnedPermutationIterator<B> {
-        OwnedPermutationIterator {
-            source,
-            curr: begin,
-            end,
-        }
+    fn new(source: Permutation<N, B>, begin: N, end: N) -> OwnedPermutationIterator<N, B> {
+        OwnedPermutationIterator { source, curr: begin, end }
     }
 }
 
-impl<B> Iterator for OwnedPermutationIterator<B>
+impl<N, B> Iterator for OwnedPermutationIterator<N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
-    type Item = u64;
+    type Item = N;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.curr == self.end {
             None
         } else {
-            let res = self.source.get(self.curr);
-            self.curr += 1;
+            let res = self.source.get(self.curr.clone());
+            self.curr.add_assign(N::one());
             Some(res)
         }
     }

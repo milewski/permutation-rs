@@ -1,31 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
+use crate::NumExt;
 use std::hash::{BuildHasher, Hasher};
 
-
 /// A basic Feistel Network cipher.
-/// 
+///
 /// The cipher requires a series of hashes which are built using
 /// a supplied [`std::hash::BuildHasher`] (passed with the parameter
 /// name `bob`, coz it'z a builder, right?)
-pub struct Feistel<B>
+pub struct Feistel<N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
     bob: B,
-    bits: usize,
-    keys: Vec<u64>,
+    bits: N,
+    keys: Vec<N>,
 }
 
-impl<B> Feistel<B>
+impl<N, B> Feistel<N, B>
 where
+    N: NumExt,
     B: BuildHasher,
 {
     /// Construct a new Feistel cipher.
-    pub fn new(bob: B, bits: usize, keys: &[u64]) -> Feistel<B> {
+    pub fn new(bob: B, bits: N, keys: &[N]) -> Feistel<N, B> {
         // Insist that there are an even number of bits.
-        assert_eq!(bits & 1, 0);
+        assert_eq!(bits.clone() & N::one(), N::zero());
         // Insist on encrypting data that fits in an unsigned 64-bit integer.
-        assert!(bits <= 64);
+        assert!(bits <= 64.into());
+
         Feistel {
             bob,
             bits,
@@ -34,45 +37,45 @@ where
     }
 
     /// Encrypt a value.
-    pub fn encrypt(&self, x: u64) -> u64 {
+    pub fn encrypt(&self, x: N) -> N {
         let (mut l, mut r) = self.split(x);
         for k in self.keys.iter() {
-            l ^= self.hash(*k, r);
+            l ^= self.hash(k.clone(), r.clone());
             (l, r) = (r, l);
         }
         self.combine(r, l)
     }
 
     /// Decrypt a value.
-    pub fn decrypt(&self, x: u64) -> u64 {
+    pub fn decrypt(&self, x: N) -> N {
         let (mut l, mut r) = self.split(x);
         for k in self.keys.iter().rev() {
-            l ^= self.hash(*k, r);
+            l ^= self.hash(k.clone(), r.clone());
             (l, r) = (r, l);
         }
         self.combine(r, l)
     }
 
-    fn split(&self, x: u64) -> (u64, u64) {
-        let n = self.bits >> 1;
-        let m = (1u64 << n) - 1;
-        let hi = x >> n;
+    fn split(&self, x: N) -> (N, N) {
+        let n = (self.bits.clone() >> 1).to_usize().unwrap();
+        let m = (N::one() << n) - N::one();
+        let hi = x.clone() >> n;
         let lo = x & m;
         (hi, lo)
     }
 
-    fn combine(&self, hi: u64, lo: u64) -> u64 {
-        let n = self.bits >> 1;
+    fn combine(&self, hi: N, lo: N) -> N {
+        let n = (self.bits.clone() >> 1).to_usize().unwrap();
         (hi << n) | lo
     }
 
-    fn hash(&self, k: u64, x: u64) -> u64 {
+    fn hash(&self, k: N, x: N) -> N {
         let mut h: <B as BuildHasher>::Hasher = self.bob.build_hasher();
-        h.write_u64(k);
-        h.write_u64(x);
-        let res = h.finish();
-        let n = self.bits >> 1;
-        let m = (1u64 << n) - 1;
+        h.write(k.to_le_bytes().as_ref());
+        h.write(x.to_le_bytes().as_ref());
+        let res: N = (h.finish() as usize).into();
+        let n = (self.bits.clone() >> 1).to_usize().unwrap();
+        let m = (N::one() << n) - N::one();
         res & m
     }
 }
@@ -132,8 +135,8 @@ mod tests {
         assert_eq!(x, z);
     }
 
-   #[test]
-   #[should_panic]
+    #[test]
+    #[should_panic]
     fn test_odd_bits() {
         let bob = DefaultBuildHasher::new();
         let bits = 1;
@@ -141,8 +144,8 @@ mod tests {
         Feistel::new(bob, bits, &keys);
     }
 
-   #[test]
-   #[should_panic]
+    #[test]
+    #[should_panic]
     fn test_excessive_bits() {
         let bob = DefaultBuildHasher::new();
         let bits = 66;
